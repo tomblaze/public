@@ -6,6 +6,7 @@
 #Work in log-space, use log-sum-exp trick if needed.
 println("Do GIBBS")
 using Distributions
+using PDMats
 
 function eq_23(sigma, lambda, n, z, x, k)
   #So we sample a mu_k given some info on observations and states.
@@ -26,39 +27,34 @@ function eq_21(x, mus, sigma)
   centers = Gaussian
 end
 
+function shuffle_rows(data)
+  rows = [1:size(data)][2]
+  row_indices = rows[1:rows;]
+  data = data[shuffle(row_indices), :]
+  return data
+end
+
 function gen_data()
-  #If there's a smarter way to do this, I don't know it unfortunately.
-  sig = 0.5
-  x_1 = Normal(rand(), sig)
-  y_1 = Normal(rand(), sig)
-  x_2 = Normal(-rand(), sig)
-  y_2 = Normal(rand(), sig)
-  x_3 = Normal(rand(), sig)
-  y_3 = Normal(-rand(), sig)
-  x_v_1 = rand(x_1, 250)
-  x_v_2 = rand(x_2, 250)
-  x_v_3 = rand(x_3, 250)
-  y_v_1 = rand(y_1, 250)
-  y_v_2 = rand(y_2, 250)
-  y_v_3 = rand(y_3, 250)
-  return [x_v_1 y_v_1; x_v_2 y_v_2; x_v_3 y_v_3]
+  #Generate three multivariate
+  sig = 1.0
+  dims = 2 #I don't imagine this'll ever change...
+  center_1 = MvNormal(randn(dims), sig)
+  center_2 = MvNormal(randn(dims), sig)
+  center_3 = MvNormal(randn(dims), sig)
+  #Sampling from MvNormal gives array like dims * n... that seems unnatural, right?
+  #Why not do "each row is datapoint"? Going to transpose.
+  samples = [rand(center_1) rand(center_2) rand(center_3)]'
+  return shuffle_rows(samples) #want to randomize order.
 end
 
 function main()
   #Generate data.
   data = gen_data()
-  rows = [1:size(data)][2]
-  row_indices = rows[1:rows;]
-  data = data[shuffle(row_indices), :]
   sigma = 1.0
   lambda = 0.5
 
   #Initiliaze mu's, where our centers start.
-  x_1 = Normal(rand() * 0.01, 0.05); y_1 = Normal(rand() * 0.01, 0.05)
-  x_2 = Normal(rand() * 0.01, 0.05); y_2 = Normal(rand() * 0.01, 0.05)
-  x_3 = Normal(rand() * 0.01, 0.05); y_3 = Normal(rand() * 0.01, 0.05)
-
-  mu = [x_1 y_1; x_2 y_2; x_3 y_3]
+  mu = rand(MvNormal(randn(2) * 0.01, 0.05), 3)
 
   for i in 1:rows
     eq_21()
