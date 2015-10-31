@@ -7,6 +7,7 @@
 println("Do GIBBS")
 using Distributions
 using PDMats
+using Gadfly
 
 function categorical_to_one_hot(z)
   top_cat = maximum(z) #let's assume we start at 1, though.
@@ -26,6 +27,7 @@ function eq_23(sigma, lambda, n, z, x, k)
   z = categorical_to_one_hot(z)
   #println(z)
   n_k = sum(z[:,k])
+  #println(n_k)
   #println(x)
   #println(x)
   x_bar_k = sum(z[:,k] .* x, 1) / n_k
@@ -94,7 +96,7 @@ function gen_data()
   center_3 = MvNormal(randn(dims), sig)
   #Sampling from MvNormal gives array like dims * n... that seems unnatural, right?
   #Why not do "each row is datapoint"? Going to transpose.
-  samples = [rand(center_1, 250) rand(center_2, 250) rand(center_3, 250)]'
+  samples = [rand(center_1, 5000) rand(center_2, 5000) rand(center_3, 5000)]'
   println("Did generate...")
   println(size(samples))
   println(center_1)
@@ -112,11 +114,12 @@ function main()
   lambda = 0.5
   K = 3
   #Initiliaze mu's, where our centers start.
-  mu = rand(MvNormal(randn(2) * 0.01, 0.05), K)'
+  mu = rand(MvNormal(randn(2), 2), K)'
+  println(mu)
   println("Past mu")
 
-  for count in 1:10000 #100 iterations is just a place-holder for a more reasonable number of iterations in future.
-    if count % 1000 == 0
+  for count in 1:1000 #100 iterations is just a place-holder for a more reasonable number of iterations in future.
+    if count % 100 == 0
       println(count)
     end
   #for i in 1:rows
@@ -126,7 +129,7 @@ function main()
     mus = zeros(K, 2)
     for i in 1:K
       #sigma, lambda, n, z, x, k
-      mu = eq_23(sigma, lambda, 750, z, data, K)
+      mu = eq_23(sigma, lambda, 15000, z, data, i)
       #println("Generated mu for $i: ", mu)
       mus[i, :] = mu
     end
