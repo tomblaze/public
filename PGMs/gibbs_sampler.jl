@@ -10,9 +10,7 @@ using PDMats
 using PyPlot
 
 function categorical_to_one_hot(z)
-  top_cat = maximum(z) #let's assume we start at 1, though.
-  #println(top_cat)
-  #println(length(z))
+  top_cat = maximum(z) #maximum category but let's assume we start at 1.
   big_array = zeros(Int64, length(z), int(top_cat))
   for val in 1:length(z)
     big_array[val, z[val]] = 1
@@ -21,28 +19,19 @@ function categorical_to_one_hot(z)
 end
 
 function eq_23(sigma, lambda, n, z, x, k)
-  #So we sample a mu_k given some info on observations and states.
-  #I think we need to remove the data point we're conditioning on...?
-  #Right, right, I need to turn z into one-hot.
   z = categorical_to_one_hot(z)
-  #println(z)
   n_k = sum(z[:,k])
-  #println(n_k)
-  #println(x)
-  #println(x)
+
   x_bar_k = sum(z[:,k] .* x, 1) / n_k
-  #println(x_bar_k)
   mu_hat_k = ((n_k / sigma^2) / ((n_k / sigma^2) + (1/lambda^2))) .* x_bar_k
   lambda_hat_k = ((n_k / sigma^2) + (1/(lambda^2)))^-1
-  #mu_hat_k, lambda_hat_k
-  #println("mu_hat_k ", mu_hat_k)
-  #println("lambda_hat_k ", lambda_hat_k)
+
   my_gauss = MvNormal(vec(mu_hat_k), lambda_hat_k)
+
   return rand(my_gauss)
 end
 
 function log_sum_exp(vec)
-  #log_vec is a vector of logarithms (not raw probabilities) to sum.
   the_max = maximum(vec)
   s = 0.0
   for i in 1:length(vec)
@@ -58,6 +47,7 @@ function total_prob(x, z, mus, sigma, K)
   end
   big_prob = 0
   for i in 1:size(x)[1]
+    #this is the part that remains incorrect.
     center_probs = [log(1/3) + logpdf(centers[j], vec(x[i, :])) for j in 1:K]
     big_prob += sum(center_probs)
   end
@@ -153,29 +143,20 @@ function main()
   scatter(u_2[1], u_2[2], c="white", s=300)
   scatter(u_3[1], u_3[2], c="white", s=300)
 
-  println(mu)
-  println("Past mu")
-
   all_probs = Float64[]
 
   num_iter = 50
   for count in 1:num_iter #100 iterations is just a place-holder for a more reasonable number of iterations in future.
-    #data = shuffle_rows(data)
     if count % 3 == 0
       println(count)
       r, g, b=color_generator((count/num_iter) * 100)
       scatter(mu[:,1], mu[:,2], c=@sprintf("#%02X%02X%02X", r, g, b), s=50)
     end
-  #for i in 1:rows
-    #eq_21 already goes for all rows...
     z = eq_21(data, mu, sigma, K)
     push!(all_probs, total_prob(data, mu, sigma, K))
-  #end
     mus = zeros(K, 2)
     for i in 1:K
-      #sigma, lambda, n, z, x, k
       mu = eq_23(sigma, lambda, 3000, z, data, i)
-      #println("Generated mu for $i: ", mu)
       mus[i, :] = mu
     end
     mu = mus
@@ -186,24 +167,5 @@ function main()
   plot(1:num_iter, all_probs)
 end
 
-#println(gen_data()[1:10, :])
 main()
 
-#Typing out pseudo-code...
-#Input: Data x and a number of components, K.
-#Initialize: mixture locations mu.
-
-#Main mixture locations u and mixture assignments z.
-
-#Repeat:
-  #For each i in (1, n):
-    #Sample z_i | {u,z_{not_i}, x} from eq. 21
-  #For each k in (1, K):
-    #Sample u_k | {u_{not_k}, z, x} from eq. 23
-
-#Equation 21: p(z_i|u, x_i) = p(z_i)p(x_i|u_{z_i}) = (pi_z) (phi(x_i', u_z, sigma^2))
-#We assume pi_z = 1/K for now.
-
-#Equation 23... u_k | z, x ~ N(u_hat_k, lambda_hat_k)
-#u_hat_k = x_bar_k * ((n_k / sigma^2) / (n_k/sigma^2 + 1/lambda^2))
-#
