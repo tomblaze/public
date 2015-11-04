@@ -13,7 +13,6 @@ function general_gen_data(K, n, dims)
   #Not sure if most efficient way to generate this, but does the trick.
   for k in 1:K
     for s in 1:n
-      println((k-1)*n + s)
       samples[(k-1)*n + s, :] = rand(norms[k])
     end
   end
@@ -99,6 +98,7 @@ function eq_21(x, mus, sigma, K)
 end
 
 function shuffle_rows(data)
+  #Just randomizes the order of our rows, just in case this is important.
   rows = size(data)[1]
   row_indices = [1:rows;]
   data = data[shuffle(row_indices), :]
@@ -109,38 +109,16 @@ function main()
   #Generate data.
   rand_int = int(rand() * 10000)
   srand(rand_int)
-  #srand(5900)
-  #Keeping track of some interesting random seeds for write-up...
-  #srand(761)
-  #srand(9561)
-  #srand(6698)
-  srand(4863)
-  #srand(5110) #genuinely doesn't quite get there...
-  #srand(4734) #the chosen one!
-  #8196 pretty interesting
-  #srand(8196)
-  #879 is a good general one.
-  #srand(61)
-  #srand(4395)
-  #srand(2471) #is fine for 6 clusters...
-  #srand(1634) #pretty exciting with 6.
-  #srand(3791)
-  #srand(4392)
-  #srand(8273)
-  #u_1, u_2, u_3, data = gen_data()
   K=3
   num_per = 2000
   centers, data = general_gen_data(K, num_per, 2)
-  println("data: ", size(data))
   scatter(data[:,1], data[:,2])
-  println("Starting")
   sigma = 1.0
   lambda = 0.5
   #Initiliaze mu's, where our centers start.
   mu = rand(MvNormal(randn(2), 2), K)'
 
   scatter(mu[:,1], mu[:,2], c="yellow", s=200)
-  println(centers)
   for center in centers
     scatter(center[1], center[2], c="white", s=300)
   end
@@ -149,7 +127,6 @@ function main()
   num_iter = 50
   for count in 1:num_iter
     if count % 1 == 0 && count > 1
-      println(count)
       r, g, b=color_generator((count/num_iter) * 100)
       scatter(mu[:,1], mu[:,2], c=@sprintf("#%02X%02X%02X", r, g, b), s=50)
     end
@@ -162,7 +139,6 @@ function main()
     end
     mu = mus
   end
-  println(mu)
   println("rand_int: ", rand_int)
   close()
   plot(1:num_iter, all_probs)
