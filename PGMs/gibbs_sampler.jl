@@ -9,6 +9,34 @@ using Distributions
 using PDMats
 using PyPlot
 
+function gen_data()
+  #Generate three multivariate
+  sig = 1.0
+  dims = 2 #I don't imagine this'll ever change...
+  u_1 = randn(dims) * 3
+  u_2 = randn(dims) * 3
+  u_3 = randn(dims) * 3
+  center_1 = MvNormal(u_1, sig)
+  center_2 = MvNormal(u_2, sig)
+  center_3 = MvNormal(u_3, sig)
+  #Sampling from MvNormal gives array like dims * n... that seems unnatural, right?
+  #Why not do "each row is datapoint"? Going to transpose.
+  samples = [rand(center_1, 1000) rand(center_2, 1000) rand(center_3, 1000)]'
+  println("Did generate...")
+  println(size(samples))
+  println(center_1)
+  println(center_2)
+  println(center_3)
+  return u_1, u_2, u_3, shuffle_rows(samples) #want to randomize order.
+end
+
+function color_generator(n)
+  r = (255 * n) / 100
+  g = (255 * (100 - n)) / 100
+  b = 0
+  return r, g, b
+end
+
 function categorical_to_one_hot(z)
   top_cat = maximum(z) #maximum category but let's assume we start at 1.
   big_array = zeros(Int64, length(z), int(top_cat))
@@ -40,7 +68,7 @@ function log_sum_exp(vec)
   return log(s) + the_max
 end
 
-function total_prob(x, z, mus, sigma, K)
+function total_prob(x, z_mat, mus, sigma, K)
   centers = MvNormal[]
   for i in 1:K
     push!(centers, MvNormal(vec(mus[i, :]), sigma))
@@ -48,8 +76,9 @@ function total_prob(x, z, mus, sigma, K)
   big_prob = 0
   for i in 1:size(x)[1]
     #this is the part that remains incorrect.
-    center_probs = [log(1/3) + logpdf(centers[j], vec(x[i, :])) for j in 1:K]
-    big_prob += sum(center_probs)
+    #need to consider the probability of the z, sum these...
+    center_probs = [log(1/3) + z_mat[i, j] + logpdf(centers[j], vec(x[i, :])) for j in 1:K]
+    big_prob += log_sum_exp(center_probs)
   end
   return big_prob
 end
@@ -68,17 +97,21 @@ function eq_21(x, mus, sigma, K)
   end
   z = zeros(size(x)[1])
   #println("size(x): ", size(x)[1])
+  z_mat = zeros(size(x)[1], K)
   for i in 1:size(x)[1]
     #for each point in x...
     #println("x ", x[i, :])
     #println(logpdf(centers[1], vec(x[i, :])))
+    #I need to acquire this, center_probs, for downtream probability measurement.
     center_probs = [logpdf(centers[j], vec(x[i, :])) for j in 1:K]
     partition = log_sum_exp(center_probs)
     #println([exp(a - partition) for a in center_probs])
-    to_sample = Categorical(float([exp(a - partition) for a in center_probs]))
+    prob_vec = float([exp(a - partition) for a in center_probs])
+    z_mat[i, :] = [(a - partition) for a in center_probs]
+    to_sample = Categorical(prob_vec)
     z[i] = rand(to_sample)
   end
-  return z
+  return z_mat, z
 end
 
 function shuffle_rows(data)
@@ -86,34 +119,6 @@ function shuffle_rows(data)
   row_indices = [1:rows;]
   data = data[shuffle(row_indices), :]
   return data
-end
-
-function gen_data()
-  #Generate three multivariate
-  sig = 1.0
-  dims = 2 #I don't imagine this'll ever change...
-  u_1 = randn(dims) * 3
-  u_2 = randn(dims) * 3
-  u_3 = randn(dims) * 3
-  center_1 = MvNormal(u_1, sig)
-  center_2 = MvNormal(u_2, sig)
-  center_3 = MvNormal(u_3, sig)
-  #Sampling from MvNormal gives array like dims * n... that seems unnatural, right?
-  #Why not do "each row is datapoint"? Going to transpose.
-  samples = [rand(center_1, 1000) rand(center_2, 1000) rand(center_3, 1000)]'
-  println("Did generate...")
-  println(size(samples))
-  println(center_1)
-  println(center_2)
-  println(center_3)
-  return u_1, u_2, u_3, shuffle_rows(samples) #want to randomize order.
-end
-
-function color_generator(n)
-  r = (255 * n) / 100
-  g = (255 * (100 - n)) / 100
-  b = 0
-  return r, g, b
 end
 
 function main()
@@ -128,6 +133,9 @@ function main()
   #srand(4863)
   #srand(5110) #genuinely doesn't quite get there...
   #srand(4734) #oh my god, the chosen one!
+  #8196 pretty interesting
+  #srand(8196)
+  #879 is a good general one.
   u_1, u_2, u_3, data = gen_data()
   println("data: ", size(data))
   scatter(data[:,1], data[:,2])
@@ -147,13 +155,13 @@ function main()
 
   num_iter = 50
   for count in 1:num_iter #100 iterations is just a place-holder for a more reasonable number of iterations in future.
-    if count % 3 == 0
+    if count % 1 == 0
       println(count)
       r, g, b=color_generator((count/num_iter) * 100)
       scatter(mu[:,1], mu[:,2], c=@sprintf("#%02X%02X%02X", r, g, b), s=50)
     end
-    z = eq_21(data, mu, sigma, K)
-    push!(all_probs, total_prob(data, mu, sigma, K))
+    z_mat, z = eq_21(data, mu, sigma, K)
+    push!(all_probs, total_prob(data, z_mat, mu, sigma, K))
     mus = zeros(K, 2)
     for i in 1:K
       mu = eq_23(sigma, lambda, 3000, z, data, i)
